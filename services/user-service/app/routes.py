@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from .database import SessionLocal
@@ -6,6 +6,7 @@ from .models import User
 from pydantic import BaseModel
 from jose import jwt, JWTError
 import datetime
+import os
 
 router = APIRouter()
 
@@ -51,3 +52,16 @@ def login(user:UserLogin,db:Session=Depends(get_db)):
     token = jwt.encode({"sub":db_user.username,"exp":datetime.datetime.utcnow()+datetime.timedelta(hours=1)},SECRET_KEY,algorithm=ALGORITHM)
 
     return {"access_token":token,"token_type":"bearer"}
+
+
+@router.get("/verify-token")
+def verify_token(authorization: str = Header(None)):
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid Token")
+    
+    token = authorization.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return {"username":payload.get("sub")}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
